@@ -1,0 +1,76 @@
+# abf.yml for steamdeck-dsp
+sources:
+  - valve-hardware-audio-processing-0.61.tar.xz
+  - rpm.patch
+  - confdir.patch
+
+build:
+  distro: cooker
+  arch:
+    - x86_64
+
+# Runtime dependencies
+requires:
+  - wireplumber
+  - lib64rnnoise0
+  - pipewire
+  - ladspa-devel
+
+# Build dependencies
+buildrequires:
+  - wireplumber
+  - make
+  - faust
+  - faust-tools
+  - boost-devel
+  - lv2-devel
+  - gcc-c++
+  - ladspa-devel
+  - lib64rnnoise-devel
+  - lib64pipewire-devel
+  - xz
+  - pkgconfig(systemd)
+
+tasks:
+  - |
+    %setup -q -n valve-hardware-audio-processing-0.61
+    %patch0 -p1
+    %patch1 -p1
+    %make_build FAUSTINC="/usr/include/faust" FAUSTLIB="/usr/share/faust"
+
+install:
+  - |
+    %make_install DEST_DIR="%{buildroot}" LIB_DIR="%{buildroot}%{_libdir}"
+    mkdir -p %{buildroot}%{_datadir}/licenses/%{name}/
+    cp LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
+
+    # Compress firmware blobs
+    xz --check=crc32 %{buildroot}%{_prefix}/lib/firmware/amd/sof/*
+    xz --check=crc32 %{buildroot}%{_prefix}/lib/firmware/amd/sof-tplg/*
+
+    # Move configs into hwsupport
+    mkdir -p %{buildroot}%{_libexecdir}/hwsupport
+    mv %{buildroot}%{_datadir}/wireplumber/hardware-profiles/wireplumber-hwconfig \
+       %{buildroot}%{_libexecdir}/hwsupport/wireplumber-hwconfig
+    mv %{buildroot}%{_datadir}/pipewire/hardware-profiles/pipewire-hwconfig \
+       %{buildroot}%{_libexecdir}/hwsupport/pipewire-hwconfig
+
+    # Clean up defaults
+    rm -fr %{buildroot}%{_datadir}/wireplumber/hardware-profiles/default
+    rm -fr %{buildroot}%{_datadir}/pipewire/hardware-profiles/default
+
+package:
+  name: steamdeck-dsp
+  version: 0.61
+  release: 1
+  summary: Steam Deck Audio Processing
+  license: GPL-2.0
+  group: Sound
+  url: https://gitlab.com/evlaV/valve-hardware-audio-processing
+  description: |
+    This package contains all audio configurations and DSP processing
+    used by SteamOS on the Steam Deck.
+  provides:
+    - valve-hardware-audio-processing = 0.61
+  exclusivearch:
+    - x86_64
